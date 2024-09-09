@@ -1,0 +1,25 @@
+html_pages:
+registe_rpage(username password1,password2,bio,image,secq1,secq2,secq3)
+login_page(both of them will be in the same page )(In the login page we will send superuser and userprofile page)USE DEFENDER for BRUTEFORCE(the user will answer all the three q/a)
+super_user_page(users,approve,reject in one table and users,delete in one table with the images)If approved send to the users box if rejected  the user name will not be be visible
+user_profile_page(userlist with images and click to another room)
+chat_room_page(messages, images, files)
+
+
+views:
+register_login(toogle between them)
+logout
+superuser
+userprofile
+chatroom
+delete
+approve
+reject
+
+env:
+secretkey
+allowedhosts
+debug 
+superuser
+redis
+postgres

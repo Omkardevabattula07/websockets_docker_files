@@ -1,48 +1,117 @@
-<!-- templates/chat/room.html -->
-
+{% load static %}
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Chat Room: {{ room.name }}</title>
+    <meta charset="UTF-8">
+    <title>Chat Room</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Link to the external CSS file -->
+    <link rel="stylesheet" href="{% static 'whats.css' %}">
 </head>
 <body>
-    <h2>Room: {{ room.name }}</h2>
 
-    <!-- Display messages for this room -->
-    <textarea id="chat-log" cols="100" rows="20" readonly>
+<div class="chat-container">
+    <div class="chat-header">
+        Chat Room - {{ room_name }}
+    </div>
+    <div id="chat-log" class="chat-body">
+        <!-- Existing messages will be loaded here -->
         {% for message in messages %}
-            {{ message.content }}
+            <div class="message">
+                {% if message.message_type == 'text' %}
+                    {{ message.content }}
+                {% elif message.message_type == 'image' %}
+                    <img src="{{ message.file.url }}" class="chat-file" alt="Image">
+                    <a href="{{ message.file.url }}" download>Download Image</a>
+                {% elif message.message_type == 'audio' %}
+                    <audio controls class="chat-file">
+                        <source src="{{ message.file.url }}" type="audio/mpeg">
+                    </audio>
+                    <a href="{{ message.file.url }}" download>Download Audio</a>
+                {% elif message.message_type == 'video' %}
+                    <video controls class="chat-file">
+                        <source src="{{ message.file.url }}" type="video/mp4">
+                    </video>
+                    <a href="{{ message.file.url }}" download>Download Video</a>
+                {% endif %}
+            </div>
         {% endfor %}
-    </textarea><br>
+    </div>
+    <div class="chat-footer">
+        <input id="chat-message-input" type="text" placeholder="Type a message...">
+        <input id="file-button" type="file">
+        <button id="send-button">Send</button>
+    </div>
+</div>
 
-    <!-- Input for new message -->
-    <input id="chat-message-input" type="text" size="100">
-    <button id="chat-message-submit">Send</button>
+<script>
+// Your JavaScript for handling WebSocket connections goes here.
+const roomName = "{{ room_name }}";
+    const chatSocket = new WebSocket(
+        'ws://' + window.location.host + '/ws/chat/' + roomName + '/'
+    );
 
-    <!-- WebSocket JavaScript -->
-    <script>
-        const roomName = "{{ room.name }}";
-        const chatSocket = new WebSocket(
-            'ws://' + window.location.host + '/ws/chat/' + roomName + '/'
-        );
+    document.querySelector('#chat-message-input').focus();
+    document.querySelector('#chat-message-input').onkeyup = function(e) {
+        if (e.keyCode === 13) {  // Enter key
+            sendMessage();
+        }
+    };
 
-        chatSocket.onmessage = function(e) {
-            const data = JSON.parse(e.data);
-            document.querySelector('#chat-log').value += (data.message + '\n');
-        };
+    document.querySelector('#send-button').onclick = function(e) {
+        sendMessage();
+    };
 
-        chatSocket.onclose = function(e) {
-            console.error('Chat socket closed unexpectedly');
-        };
+    function sendMessage() {
+        const messageInputDom = document.querySelector('#chat-message-input');
+        const message = messageInputDom.value;
+        chatSocket.send(JSON.stringify({
+            'type': 'text',
+            'message': message
+        }));
+        messageInputDom.value = '';
+    }
 
-        document.querySelector('#chat-message-submit').onclick = function(e) {
-            const messageInputDom = document.querySelector('#chat-message-input');
-            const message = messageInputDom.value;
+    document.querySelector('#file-button').addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        const reader = new FileReader();
+
+        reader.onload = function(event) {
+            const base64Data = event.target.result;
+            const messageType = file.type.split('/')[0];  // 'image', 'audio', 'video'
             chatSocket.send(JSON.stringify({
-                'message': message
+                'type': messageType,
+                'file': base64Data,
             }));
-            messageInputDom.value = '';
         };
-    </script>
+        reader.readAsDataURL(file);  // Read file as base64
+    });
+
+    chatSocket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        const chatLog = document.querySelector('#chat-log');
+
+        if (data.type === 'text') {
+            const messageElement = document.createElement('div');
+            messageElement.className = 'message';
+            messageElement.textContent = data.message;
+            chatLog.appendChild(messageElement);
+        } else if (['image', 'audio', 'video'].includes(data.type)) {
+            const fileElement = document.createElement(data.type);
+            fileElement.src = data.file_url;
+            fileElement.controls = true;
+            fileElement.className = 'chat-file';
+            chatLog.appendChild(fileElement);
+
+            // Add download link for the file
+            const downloadLink = document.createElement('a');
+            downloadLink.href = data.file_url;
+            downloadLink.textContent = 'Download';
+            downloadLink.download = '';
+            chatLog.appendChild(downloadLink);
+        }
+    };
+</script>
+
 </body>
 </html>
