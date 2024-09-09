@@ -1,0 +1,105 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Room: {{ room_name }}</title>
+    <link rel="stylesheet" type="text/css" href="{% static 'styles.css' %}">
+    <script>
+        const roomName = "{{ room_name }}";
+        const ws = new WebSocket(
+            'ws://' + window.location.host + '/ws/chat/' + roomName + '/'
+        );
+
+        ws.onmessage = function(e) {
+            const data = JSON.parse(e.data);
+            const messageElement = document.createElement('div');
+            messageElement.classList.add('message');
+
+            if (data.message.text) {
+                messageElement.innerHTML = `<strong>${data.message.user}:</strong> ${data.message.text}`;
+            } else if (data.message.image) {
+                const imageElement = document.createElement('img');
+                imageElement.src = data.message.image;
+                imageElement.alt = `${data.message.user}'s image`;
+                imageElement.style.maxWidth = '200px';
+
+                const downloadLink = document.createElement('a');
+                downloadLink.href = data.message.image;
+                downloadLink.download = 'image';
+                downloadLink.innerHTML = 'Download Image';
+
+                messageElement.innerHTML = `<strong>${data.message.user}:</strong> `;
+                messageElement.appendChild(imageElement);
+                messageElement.appendChild(document.createElement('br'));
+                messageElement.appendChild(downloadLink);
+            } else if (data.message.file) {
+                const fileElement = document.createElement('a');
+                fileElement.href = 'data:application/octet-stream;base64,' + data.message.file.content;
+                fileElement.download = data.message.file.name;
+                fileElement.innerHTML = `Download ${data.message.file.name}`;
+
+                messageElement.innerHTML = `<strong>${data.message.user}:</strong> `;
+                messageElement.appendChild(fileElement);
+            }
+
+            document.querySelector('#chat-log').appendChild(messageElement);
+        };
+
+        document.querySelector('#send-message-btn').onclick = function() {
+            const messageInputDom = document.querySelector('#chat-message-input');
+            const message = messageInputDom.value;
+            ws.send(JSON.stringify({
+                'message': message,
+            }));
+            messageInputDom.value = '';
+        };
+
+        document.querySelector('#send-image-btn').onclick = function() {
+            const imageInputDom = document.querySelector('#chat-image-input');
+            const file = imageInputDom.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                ws.send(JSON.stringify({
+                    'image': e.target.result,
+                }));
+            };
+            reader.readAsDataURL(file);
+        };
+
+        document.querySelector('#send-file-btn').onclick = function() {
+            const fileInputDom = document.querySelector('#chat-file-input');
+            const file = fileInputDom.files[0];
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                ws.send(JSON.stringify({
+                    'file': {
+                        'name': file.name,
+                        'content': e.target.result.split(',')[1],
+                    }
+                }));
+            };
+            reader.readAsDataURL(file);
+        };
+    </script>
+</head>
+<body>
+    <div class="chat-container">
+        <h1>Room: {{ room_name }}</h1>
+        <div id="chat-log" class="chat-log"></div>
+        <div class="chat-input">
+            <input id="chat-message-input" type="text" placeholder="Type a message...">
+            <button id="send-message-btn">Send</button>
+        </div>
+        <div class="chat-uploads">
+            <input id="chat-image-input" type="file" accept="image/*">
+            <button id="send-image-btn">Send Image</button>
+            <input id="chat-file-input" type="file">
+            <button id="send-file-btn">Send File</button>
+        </div>
+        <div class="back-link">
+            <a href="{% url 'rooms' %}">Back to Rooms</a>
+        </div>
+    </div>
+</body>
+</html>
